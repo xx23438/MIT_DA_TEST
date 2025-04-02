@@ -1,0 +1,89 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+library(tree)
+library(randomForest)
+library(dismo)
+library(gbm)
+library(tidyverse)
+```
+
+1. Load data
+```{r}
+train <- read.csv("train.csv")
+test <- read.csv("test.csv")
+descriptions <- read.csv("column_descriptions.csv")
+sample <- read.csv("sample_submission.csv")
+```
+
+2. Preprocessing
+```{r}
+# use `percent` data in `train` dataset
+names <- colnames(train)
+percent <- str_detect(names, "P")
+percent.train <- train[which(percent==T)]
+percent.train <- cbind(train[,c(2,3)], percent.train, train[195:215])
+
+# remove total_votes, under 18-year-old, `female`, X0033PE
+percent.train <- percent.train[,-c(2,5, 6, 7, 8, 18, 19, 21, 22, 23, 24, 27, 4, 26, 29, 82, 30)]
+
+# top 16 most contributed variable
+top_contri <- c(76,18,44,78,56,47,45,25,86,59,84,19,27,12,74,57)
+```
+
+3. Final model 1 (gbm_model_1)
+```{r message=FALSE}
+# a. tuning of hyperparameters
+# gbm.step: assess the optimal number of boosting trees using v-fold cross validation
+# gbm.x: top 16 most contributed variable
+# gbm.y: percent_dem
+# tree.complexity: sets the complexity of individual trees
+# learning.rate: sets the weight applied to inidividual trees
+set.seed(173)
+gbm_cv <- gbm.step(data = percent.train, gbm.x =top_contri, gbm.y = 1, family = 'gaussian', tree.complexity = 11, learning.rate = 0.04)
+
+# b. fit the model
+# extract the best hyperparameters in gbm.step: minimum residual deviance
+# n.trees (450): specifying the total number of trees to fit
+# shrinkage (0.04): step-size reduction
+# interaction.depth (11): specifying the maximum depth of each tree (the highest level of variable interactions allowed)
+gbm_model_1 <- gbm(percent_dem~., data = percent.train, n.trees = gbm_cv$n.trees, shrinkage = gbm_cv$shrinkage, interaction.depth =  gbm_cv$interaction.depth)
+
+# c. prediction
+gbm_predict <- predict(gbm_model_1, test)
+ans <- bind_cols(Id=test$id, Predicted=gbm_predict)
+write.csv(ans,"result_1.csv", row.names = F)
+```
+
+3. Final model 2 (gbm_model_2)
+```{r message=FALSE}
+# a. tuning of hyperparameters
+# gbm.step: assess the optimal number of boosting trees using v-fold cross validation
+# gbm.x: all the variables (85 in total)
+# gbm.y: percent_dem
+# tree.complexity: sets the complexity of individual trees
+# learning.rate: sets the weight applied to inidividual trees
+set.seed(173)
+gbm_cv <- gbm.step(data = percent.train, gbm.x =2:86, gbm.y = 1, family = 'gaussian', tree.complexity = 12, learning.rate = 0.06)
+
+# b. fit the model
+# extract the best hyperparameters in gbm.step: minimum residual deviance
+# n.trees (1000): specifying the total number of trees to fit
+# shrinkage (0.06): step-size reduction
+# interaction.depth (12): specifying the maximum depth of each tree (the highest level of variable interactions allowed)
+gbm_model_2 <- gbm(percent_dem~., data = percent.train, n.trees = gbm_cv$n.trees, shrinkage = gbm_cv$shrinkage, interaction.depth =  gbm_cv$interaction.depth)
+
+# c. prediction
+gbm_predict <- predict(gbm_model_2, test)
+ans <- bind_cols(Id=test$id, Predicted=gbm_predict)
+write.csv(ans,"result_2.csv", row.names = F)
+```
+
