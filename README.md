@@ -1,4 +1,4 @@
---- Xiaocong's Technical Test ---
+--- Xiaocong's Technical Test Files ---
 1. Code_Sample1_python.ipynb: this is the first code sample in python
 2. Code_Sample2_R.Rmd: this is the second code sample in R
 3. Task1_a.sql: answer for 1a
